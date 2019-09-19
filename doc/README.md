@@ -6,7 +6,9 @@ The doc directory contains the report or presentation files. It can have subfold
 
 For peer reviews, run the FullAnalysisForPeerReview.Rmd. To run this code, all you need to do is set your working directory to the folder before you store your "Data". The relative path in the R Markdown file is ../Data/lyrics.RData
 
-Everything is done based off of this. The longest portion to run is the stemming section. On my computer it takes about 30 minutes, hopefully for you it is the same!
+VERY IMPORTANT: You need to go to the "figs" folder and download "CiaraFuture.jpg" and "FutureZahirWilburn.jpg". Save them into the same data folder that has "lyrics.RData". These images are used to generate the final HTML output.
+
+The longest portion to run is the stemming section. On my computer it takes about 30 minutes, hopefully for you it is the same!
 
 TextProcessing.Rmd is the file that was given to us by the intructor group. I modified it to remove all vulgar words as well, because I wanted a little more meaning for the lyrics I was analyzing.
 
