@@ -1,0 +1,519 @@
+---
+title: "How did Future Zahir Wilburn change Ciara and Future?"
+author: "Jess Mathew"
+date: "September 16, 2019"
+output: html_document
+---
+
+"lyrics.csv" is a filtered corpus of 380,000+ song lyrics from from MetroLyrics. You can read more about it on [Kaggle](https://www.kaggle.com/gyani95/380000-lyrics-from-metrolyrics).
+
+"artists.csv" provides the background information of all the artistis. These information are scraped from [LyricsFreak](https://www.lyricsfreak.com/).
+
+In this R notebook, we process the raw textual data for our data analysis.
+
+### Step 0 - Load all the required libraries
+
+From the packages' descriptions:
+
++ `tm` is a framework for text mining applications within R;
++ `data.table` is a package for fast aggregation of large data;
++ `tidyverse` is an opinionated collection of R packages designed for data science. All packages share an underlying design philosophy, grammar, and data structures;
++ `tidytext` allows text mining using 'dplyr', 'ggplot2', and other tidy tools;
++ `DT` provides an R interface to the JavaScript library DataTables.
+
+```{r load libraries, warning=FALSE, message=FALSE}
+library(tm)
+library(data.table)
+library(tidytext)
+library(tidyverse)
+library(DT)
+library(magrittr)
+library(stringr)
+library(dplyr)
+library(ggplot2)
+library(tm)
+library(wordcloud)
+library(syuzhet)
+library(tidytext)
+library(tidyr)
+library(igraph)
+library(ggraph)
+library(readr)
+library(circlize)
+library(reshape2)
+```
+
+### Step 1 - Load the data to be cleaned and processed
+
+```{r}
+# load lyrics data
+load('../Data/lyrics.RData') 
+```
+
+
+### Step 2 - Preliminary cleaning of text
+
+We clean the text by converting all the letters to the lower case, and removing punctuation, numbers, empty words and extra white space.
+
+```{r text processing in tm}
+# function for removimg leading and trailing whitespace from character strings 
+leadingWhitespace <- content_transformer(function(x) str_trim(x, side = "both"))
+# remove stop words
+data("stop_words")
+word <- c("lot", "today", "months", "month", "wanna", "wouldnt", "wasnt", "ha", "na", "ooh", "da",
+        "gonna", "im", "dont", "aint", "wont", "yeah", "la", "oi", "hi", "bye",
+          "hey", "year", "years", "last", "past", "feel", "fuck", "nigga", "bitch", "shit", "niggas", "bitches", "bitchs", "motherfucker", "motherfuckers")
+stop_words <- c(stop_words$word, word)
+# clean the data and make a corpus
+corpus <- VCorpus(VectorSource(dt_lyrics$lyrics))%>%
+  tm_map(content_transformer(tolower))%>%
+  tm_map(removePunctuation)%>%
+  tm_map(removeWords, character(0))%>%
+  tm_map(removeWords, stop_words)%>%
+  tm_map(removeNumbers)%>%
+  tm_map(stripWhitespace)%>%
+  tm_map(leadingWhitespace)
+```
+
+
+### Step 3 - Stemming words and converting tm object to tidy object
+
+Stemming reduces a word to its word *stem*. We stem the words here and then convert the "tm" object to a "tidy" object for much faster processing.
+
+```{r stemming}
+stemmed <- tm_map(corpus, stemDocument) %>%
+  tidy() %>%
+  select(text)
+```
+
+### Step 4 - Creating tidy format of the dictionary to be used for completing stems
+
+We also need a dictionary to look up the words corresponding to the stems.
+
+```{r tidy dictionary}
+dict <- tidy(corpus) %>%
+  select(text) %>%
+  unnest_tokens(dictionary, text)
+```
+
+### Step 5 - Combining stems and dictionary into the same tibble
+
+Here we combine the stems and the dictionary into the same "tidy" object.
+
+```{r tidy stems with dictionary}
+completed <- stemmed %>%
+  mutate(id = row_number()) %>%
+  unnest_tokens(stems, text) %>%
+  bind_cols(dict) 
+```
+
+### Step 6 - Stem completion
+
+Lastly, we complete the stems by picking the corresponding word with the highest frequency.
+
+```{r stem completion, warning=FALSE, message=FALSE}
+completed <- completed %>%
+  group_by(stems) %>%
+  count(dictionary) %>%
+  mutate(word = dictionary[which.max(n)]) %>%
+  ungroup() %>%
+  select(stems, word) %>%
+  distinct() %>%
+  right_join(completed) %>%
+  select(-stems)
+```
+
+### Step 8 - Pasting stem completed individual words into their respective lyrics
+
+We want our processed words to resemble the structure of the original lyrics. So we paste the words together to form processed lyrics.
+
+```{r reverse unnest}
+completed <- completed %>%
+  group_by(id) %>%
+  summarise(stemmedwords= str_c(word, collapse = " ")) %>%
+  ungroup()
+```
+
+### Step 9 - Keeping a track of the processed lyrics with their own ID
+
+```{r cleaned hm_data, warning=FALSE, message=FALSE}
+dt_lyrics <- dt_lyrics %>%
+  mutate(id = row_number()) %>%
+  inner_join(completed)
+```
+
+### Exporting the processed text data into a CSV file
+
+```{r export data}
+save(dt_lyrics, file="../Data/processed_lyrics.RData")
+```
+
+The final processed data is ready to be used for any kind of analysis.
+
+![ ](../Data/CiaraFuture.jpg)
+
+![ ](..//Data/FutureZahirWilburn.jpg)
+
+```{r, warning=FALSE, message=FALSE,echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r version,warning=FALSE, message=FALSE,echo=FALSE}
+print(R.version)
+```
+
+# Background
+
+Future Zahir Wilburn is the son that Ciara and Future had together. This report will be an analysis on how the birth of that child affected Ciara and Future. My original premise was to see how parenthood affected men and women differently, but I think it would be even more interesting to see how the birth of the same child affects the parents of that child.
+
+```{r libraries,warning=FALSE, message=FALSE,echo=FALSE}
+```
+
+The first step was to use the 'lyrics.RData' file and clean the data. We did so by removing stop words and leaving a stemmed version of the lyrics, allowing us to have a meaningful result in the end (hopefully). The 'TextProcessing.Rmd' file was used for the process. I left the file untouched for the most part, but I did try and eliminate all the curse words because I decided that this would be a telling factory in seeing if people changed after parenthood. I didn't want my results to be filled with that kind of meaningless knowledge.
+
+```{r read data,warning=FALSE, message=FALSE,echo=FALSE}
+processedLyricsData <- get(load("../Data/processed_lyrics.RData"))
+processedLyricsData <- as.data.frame(processedLyricsData)
+
+processedLyricsData$length <- str_count(processedLyricsData$lyrics,"\\S+") 
+processedLyricsData$stemmedcharacters <- as.character(processedLyricsData$stemmedwords)
+```
+
+Using the processed lyrics data, I filtered out for Future and Ciara. I then did my own research and found that Zahir was born in 2014. Using this information, I split the lyrics of Future and Ciara into two grops, one prior to 2014 and the other contains lyrics for 2014 and beyond.
+
+```{r filter data for analysis,warning=FALSE, message=FALSE,echo=FALSE}
+djKhaledData <- processedLyricsData[processedLyricsData$artist == "dj-khaled", ]
+djKhaledPreParenthoodData <- djKhaledData[djKhaledData$year < "2016", ]
+djKhaledPostParenthoodData <- djKhaledData[djKhaledData$year >= "2016", ]
+
+floridaData <- processedLyricsData[processedLyricsData$artist == "flo-rida", ]
+floridaPreParenthoodData <- floridaData[floridaData$year < "2011", ]
+floridaPostParenthoodData <- floridaData[floridaData$year >= "2011", ]
+
+chrisBrownData <- processedLyricsData[processedLyricsData$artist == "chris-brown", ]
+chrisBrownPreParenthoodData <- chrisBrownData[chrisBrownData$year < "2014", ]
+chrisBrownPostParenthoodData <- chrisBrownData[chrisBrownData$year >= "2014", ]
+
+futureData <- processedLyricsData[processedLyricsData$artist == "future", ]
+futurePreParenthoodData <- futureData[futureData$year < "2014", ]
+futurePostParenthoodData <- futureData[futureData$year >= "2014", ]
+
+adeleData <- processedLyricsData[processedLyricsData$artist == "adele", ]
+adelePreParenthoodData <- adeleData[adeleData$year < "2012", ]
+adelePostParenthoodData <- adeleData[adeleData$year >= "2012", ]
+
+aliciaKeysData <- processedLyricsData[processedLyricsData$artist == "alicia-keys", ]
+aliciaKeysPreParenthoodData <- aliciaKeysData[aliciaKeysData$year < "2010", ]
+aliciaKeysPostParenthoodData <- aliciaKeysData[aliciaKeysData$year >= "2010", ]
+
+christinaAguileraData <- processedLyricsData[processedLyricsData$artist == "christina-aguilera", ]
+christinaAguileraPreParenthoodData <- christinaAguileraData[christinaAguileraData$year < "2008", ]
+christinaAguileraPostParenthoodData <- christinaAguileraData[christinaAguileraData$year >= "2008", ]
+
+ciaraData <- processedLyricsData[processedLyricsData$artist == "ciara", ]
+ciaraPreParenthoodData <- ciaraData[ciaraData$year < "2014", ]
+ciaraPostParenthoodData <- ciaraData[ciaraData$year >= "2014", ]
+
+maleArtistsPreParenthoodData <- merge(djKhaledPreParenthoodData, floridaPreParenthoodData, all=TRUE)
+maleArtistsPreParenthoodData <- merge(maleArtistsPreParenthoodData, chrisBrownPreParenthoodData, all=TRUE)
+maleArtistsPreParenthoodData <- merge(maleArtistsPreParenthoodData, futurePreParenthoodData, all=TRUE)
+
+maleArtistsPreParenthoodData <- futurePreParenthoodData
+# maleArtistsPreParenthoodData <- djKhaledPreParenthoodData
+
+maleArtistsPostParenthoodData <- merge(djKhaledPostParenthoodData, floridaPostParenthoodData, all=TRUE)
+maleArtistsPostParenthoodData <- merge(maleArtistsPostParenthoodData, chrisBrownPostParenthoodData, all=TRUE)
+maleArtistsPostParenthoodData <- merge(maleArtistsPostParenthoodData, futurePostParenthoodData, all=TRUE)
+
+maleArtistsPostParenthoodData <- futurePostParenthoodData
+# maleArtistsPostParenthoodData <- djKhaledPostParenthoodData
+
+femaleArtistsPreParenthoodData <- merge(adelePreParenthoodData, aliciaKeysPreParenthoodData, all=TRUE)
+femaleArtistsPreParenthoodData <- merge(femaleArtistsPreParenthoodData, christinaAguileraPreParenthoodData, all=TRUE)
+femaleArtistsPreParenthoodData <- merge(femaleArtistsPreParenthoodData, ciaraPreParenthoodData, all=TRUE)
+
+femaleArtistsPreParenthoodData <- ciaraPreParenthoodData
+
+femaleArtistsPostParenthoodData <- merge(adelePostParenthoodData, aliciaKeysPostParenthoodData, all=TRUE)
+femaleArtistsPostParenthoodData <- merge(femaleArtistsPostParenthoodData, christinaAguileraPostParenthoodData, all=TRUE)
+femaleArtistsPostParenthoodData <- merge(femaleArtistsPostParenthoodData, ciaraPostParenthoodData, all=TRUE)
+
+femaleArtistsPostParenthoodData <- ciaraPostParenthoodData
+```
+
+People always say, "Being a parent changes you in so many ways. I can't explain it, you just have to experience it for yourself." Well, let's see if an analysis into song lyrics can give us answers that no parent has been able to offer thus far!
+
+
+# Question 1: How does parenthood change language choices?
+
+```{r language choices: setup,warning=FALSE, message=FALSE,echo=FALSE}
+maleArtistsPreParenthoodlength_df <- maleArtistsPreParenthoodData %>% 
+             group_by(song) %>% 
+             summarise(length = sum(length))
+
+maleArtistsPostParenthoodlength_df <- maleArtistsPostParenthoodData %>% 
+             group_by(song) %>% 
+             summarise(length = sum(length))
+
+femaleArtistsPreParenthoodlength_df <- femaleArtistsPreParenthoodData %>% 
+             group_by(song) %>% 
+             summarise(length = sum(length))
+
+femaleArtistsPostParenthoodlength_df <- femaleArtistsPostParenthoodData %>% 
+             group_by(song) %>% 
+             summarise(length = sum(length))
+```
+
+```{r language choices: males,warning=FALSE, message=FALSE,echo=FALSE}
+ggplot(maleArtistsPreParenthoodlength_df, aes(x=length)) + 
+  geom_histogram(bins=50,aes(fill = ..count..)) + 
+  geom_vline(aes(xintercept=mean(length)),
+             color="#FFFFFF", linetype="dashed", size=1) +
+  geom_density(aes(y=25 * ..count..),alpha=.2, fill="#1CCCC6") +
+  ylab("Count") + xlab ("Length") + 
+  ggtitle("Lyric Word Count Future Pre Parenthood") + 
+  theme_minimal()
+
+ggplot(maleArtistsPostParenthoodlength_df, aes(x=length)) + 
+  geom_histogram(bins=50,aes(fill = ..count..)) + 
+  geom_vline(aes(xintercept=mean(length)),
+             color="#FFFFFF", linetype="dashed", size=1) +
+  geom_density(aes(y=25 * ..count..),alpha=.2, fill="#1CCCC6") +
+  ylab("Count") + xlab ("Length") + 
+  ggtitle("Lyric Word Count Future Post Parenthood") + 
+  theme_minimal()
+```
+
+Interestingly, post parenthood it seems as if the lyrics of Future actually increased in length. The average increased by 100 words and the longest song was over 250 words longer in length. We will have to analyze the words being said to understand fully if more meaningful lyrics are being used.
+
+```{r language choices: females,warning=FALSE, message=FALSE,echo=FALSE}
+ggplot(femaleArtistsPreParenthoodlength_df, aes(x=length)) + 
+  geom_histogram(bins=50,aes(fill = ..count..)) + 
+  geom_vline(aes(xintercept=mean(length)),
+             color="#FFFFFF", linetype="dashed", size=1) +
+  geom_density(aes(y=25 * ..count..),alpha=.2, fill="#1CCCC6") +
+  ylab("Count") + xlab ("Length") + 
+  ggtitle("Lyric Word Count Ciara Pre Parenthood") + 
+  theme_minimal()
+
+ggplot(femaleArtistsPostParenthoodlength_df, aes(x=length)) + 
+  geom_histogram(bins=50,aes(fill = ..count..)) + 
+  geom_vline(aes(xintercept=mean(length)),
+             color="#FFFFFF", linetype="dashed", size=1) +
+  geom_density(aes(y=25 * ..count..),alpha=.2, fill="#1CCCC6") +
+  ylab("Count") + xlab ("Length") + 
+  ggtitle("Lyric Word Count Ciara Post Parenthood") + 
+  theme_minimal()
+```
+
+Conversely, it seems that parenthood had no substational affect to Ciara's music in that regard. She did have a few songs that ended up being on the longer side, after Zahir was born, however her overall average length stayed right about the same.
+
+On a basic preliminary analysis, it seems that Future had more lengthy and meaningful messages to give to his audience after he became a father to Zahir.
+
+Now we will take a look at the actual content in the lyrics themselves. This leads us to our second question.
+
+# Question 2: How does parenthood change interests?
+
+We will first compare the lyrics of Future pre and post parenthood.
+
+```{r text mining: males,warning=FALSE, message=FALSE,echo=FALSE}
+malePreLyrics_text <- maleArtistsPreParenthoodData$stemmedwords
+#creating a text corpus
+docs <- Corpus(VectorSource(malePreLyrics_text))
+# Converting the text to lower case
+docs <- tm_map(docs, content_transformer(tolower))
+# creating term document matrix
+tdm <- TermDocumentMatrix(docs)
+# defining tdm as matrix
+m <- as.matrix(tdm)
+# getting word counts in decreasing order
+word_freqs = sort(rowSums(m), decreasing=TRUE)
+# creating a data frame with words and their frequencies
+malePreLyrics_wc_df <- data.frame(word=names(word_freqs), freq=word_freqs)
+
+malePreLyrics_wc_df <- malePreLyrics_wc_df[1:300,]
+
+# plotting wordcloud
+
+set.seed(1)
+wordcloud(words = malePreLyrics_wc_df$word, freq = malePreLyrics_wc_df$freq,
+min.freq = 1,scale=c(4,.5),
+max.words=150, random.order=FALSE, rot.per=0.15,
+colors=brewer.pal(8, "Dark2"))
+
+malePostLyrics_text <- maleArtistsPostParenthoodData$stemmedwords
+#creating a text corpus
+docs <- Corpus(VectorSource(malePostLyrics_text))
+# Converting the text to lower case
+docs <- tm_map(docs, content_transformer(tolower))
+# creating term document matrix
+tdm <- TermDocumentMatrix(docs)
+# defining tdm as matrix
+m <- as.matrix(tdm)
+# getting word counts in decreasing order
+word_freqs = sort(rowSums(m), decreasing=TRUE)
+# creating a data frame with words and their frequencies
+malePostLyrics_wc_df <- data.frame(word=names(word_freqs), freq=word_freqs)
+
+malePostLyrics_wc_df <- malePostLyrics_wc_df[1:300,]
+
+# plotting wordcloud
+
+set.seed(12)
+wordcloud(words = malePostLyrics_wc_df$word, freq = malePostLyrics_wc_df$freq,
+min.freq = 1,scale=c(4,.5),
+max.words=150, random.order=FALSE, rot.per=0.15,
+colors=brewer.pal(8, "Dark2"))
+```
+
+Comparing the word clouds, we see that post parenthood, Future talks more about 'move's, 'money', 'love', 'diamonds', 'bags' and 'baby'. This seems to lend itself to the idea that after having a child, Future wants to be able provide for and protect his child and the mother of his child. Now let's take a look at the content in Ciara's world cloud to see if any insights can be drawn from that.
+
+```{r text mining: females,warning=FALSE, message=FALSE,echo=FALSE}
+femalePreLyrics_text <- femaleArtistsPreParenthoodData$stemmedwords
+#creating a text corpus
+docs <- Corpus(VectorSource(femalePreLyrics_text))
+# Converting the text to lower case
+docs <- tm_map(docs, content_transformer(tolower))
+# creating term document matrix
+tdm <- TermDocumentMatrix(docs)
+# defining tdm as matrix
+m <- as.matrix(tdm)
+# getting word counts in decreasing order
+word_freqs = sort(rowSums(m), decreasing=TRUE)
+# creating a data frame with words and their frequencies
+femalePreLyrics_wc_df <- data.frame(word=names(word_freqs), freq=word_freqs)
+
+femalePreLyrics_wc_df <- femalePreLyrics_wc_df[1:300,]
+
+# plotting wordcloud
+
+set.seed(1)
+wordcloud(words = femalePreLyrics_wc_df$word, freq = femalePreLyrics_wc_df$freq,
+min.freq = 1,scale=c(4,.5),
+max.words=150, random.order=FALSE, rot.per=0.15,
+colors=brewer.pal(8, "Dark2"))
+
+femalePostLyrics_text <- femaleArtistsPostParenthoodData$stemmedwords
+#creating a text corpus
+docs <- Corpus(VectorSource(femalePostLyrics_text))
+# Converting the text to lower case
+docs <- tm_map(docs, content_transformer(tolower))
+# creating term document matrix
+tdm <- TermDocumentMatrix(docs)
+# defining tdm as matrix
+m <- as.matrix(tdm)
+# getting word counts in decreasing order
+word_freqs = sort(rowSums(m), decreasing=TRUE)
+# creating a data frame with words and their frequencies
+femalePostLyrics_wc_df <- data.frame(word=names(word_freqs), freq=word_freqs)
+
+femalePostLyrics_wc_df <- femalePostLyrics_wc_df[1:300,]
+
+# plotting wordcloud
+
+set.seed(12)
+wordcloud(words = femalePostLyrics_wc_df$word, freq = femalePostLyrics_wc_df$freq,
+min.freq = 1,scale=c(4,.5),
+max.words=150, random.order=FALSE, rot.per=0.15,
+colors=brewer.pal(8, "Dark2"))
+```
+
+Interestingly, the most used word, prior to Zahir, was 'baby'. Assuming that this was related to a baby in the sense of a significant other. While post parenthood, the most prominent word is actually 'love'. Another thing worth noting is that the word'lullaby' is used prominently after childbirth as was the word 'life'. "Lullaby' in particular siginifies sings songs to a baby to help them fall asleep. So post parenthood, Ciara's song seem to have a more motherly touch. 
+
+Looking into this further causes us to ask a third question!
+
+# Question 3: How does parenthood change overall mood?
+
+We will first perform sentiment analysis on Future's song lyrics to see if there is a difference in the overall mood of the songs from pre parenthood or post parenthood.
+
+```{r sentiment analysis: males,warning=FALSE, message=FALSE,echo=FALSE}
+# Getting the sentiment value for the lyrics
+malePreTy_sentiment <- get_nrc_sentiment((malePreLyrics_text))
+
+# Dataframe with cumulative value of the sentiments
+sentimentscores<-data.frame(colSums(malePreTy_sentiment[,]))
+
+# Dataframe with sentiment and score as columns
+names(sentimentscores) <- "Score"
+sentimentscores <- cbind("sentiment"=rownames(sentimentscores),sentimentscores)
+rownames(sentimentscores) <- NULL
+
+# Plot for the cumulative sentiments
+ggplot(data=sentimentscores,aes(x=sentiment,y=Score))+
+geom_bar(aes(fill=sentiment),stat = "identity")+
+theme(legend.position="none")+
+xlab("Sentiments")+ylab("Scores")+
+ggtitle("Total Pre Parenthood Sentiment for Future")+
+theme_minimal()
+
+# Getting the sentiment value for the lyrics
+malePostTy_sentiment <- get_nrc_sentiment((malePostLyrics_text))
+
+# Dataframe with cumulative value of the sentiments
+sentimentscores<-data.frame(colSums(malePostTy_sentiment[,]))
+
+# Dataframe with sentiment and score as columns
+names(sentimentscores) <- "Score"
+sentimentscores <- cbind("sentiment"=rownames(sentimentscores),sentimentscores)
+rownames(sentimentscores) <- NULL
+
+# Plot for the cumulative sentiments
+ggplot(data=sentimentscores,aes(x=sentiment,y=Score))+
+geom_bar(aes(fill=sentiment),stat = "identity")+
+theme(legend.position="none")+
+xlab("Sentiments")+ylab("Scores")+
+ggtitle("Total Post Parenthood Sentiment for Future")+
+theme_minimal() 
+```
+
+There are some interesting pieces of information available here. We can see that the 'negative' sentiments rose post children. This correlates well with the idea that male artists view children as a burden and not a source of emotional joy. For male artists, children seem to be a point of negativity. It seems to be a running trend that relationship male music artists have with their children is strictly financial, viewing them more as a mistake than a blessing.
+
+```{r sentiment analysis: females,warning=FALSE, message=FALSE,echo=FALSE}
+# Getting the sentiment value for the lyrics
+femalePreTy_sentiment <- get_nrc_sentiment((femalePreLyrics_text))
+
+# Dataframe with cumulative value of the sentiments
+sentimentscores<-data.frame(colSums(femalePreTy_sentiment[,]))
+
+# Dataframe with sentiment and score as columns
+names(sentimentscores) <- "Score"
+sentimentscores <- cbind("sentiment"=rownames(sentimentscores),sentimentscores)
+rownames(sentimentscores) <- NULL
+
+# Plot for the cumulative sentiments
+ggplot(data=sentimentscores,aes(x=sentiment,y=Score))+
+geom_bar(aes(fill=sentiment),stat = "identity")+
+theme(legend.position="none")+
+xlab("Sentiments")+ylab("Scores")+
+ggtitle("Total Pre Parenthood Sentiment for Ciara")+
+theme_minimal()
+
+# Getting the sentiment value for the lyrics
+femalePostTy_sentiment <- get_nrc_sentiment((femalePostLyrics_text))
+
+# Dataframe with cumulative value of the sentiments
+sentimentscores<-data.frame(colSums(femalePostTy_sentiment[,]))
+
+# Dataframe with sentiment and score as columns
+names(sentimentscores) <- "Score"
+sentimentscores <- cbind("sentiment"=rownames(sentimentscores),sentimentscores)
+rownames(sentimentscores) <- NULL
+
+# Plot for the cumulative sentiments
+ggplot(data=sentimentscores,aes(x=sentiment,y=Score))+
+geom_bar(aes(fill=sentiment),stat = "identity")+
+theme(legend.position="none")+
+xlab("Sentiments")+ylab("Scores")+
+ggtitle("Total Post Parenthood Sentiment for Ciara")+
+theme_minimal() 
+```
+
+While most of Ciara's other sentiments generally stayed the same, 'joy', 'anticipation', and 'surprise' grew substantionally! This is very interesting because babies tend to give mothers those very same emotions. Possibly without her even realizing it, her views on her child ebbed their way into the lyrics for her songs.
+
+# Conclusions
+
+Overall, it seems to be that Future Zahir Wilburn had a positive effect on Future and Ciara.
+
+Looking at Future, we can see that his lyrics became lengther and he spoke of meaningful things that related to sustaining a family. He talks about 'money', 'diamonds', 'love', 'move's; and 'life' as his main topics post parenthood. While he also had an overall increase in the 'negative' sentiment, this can be attributed to the common culture of male artists to view children as more of a burden financially than a blessing emotionally. But the underlying theme for him is that he will provide for his family.
+
+Looking at Ciara, we can see that, while her lyric length stayed about the same, the content of them changed quite a bit. 'Love' became the most common word in her lyrics and other words like 'lullaby', 'life', and 'baby' became much for prominent. This can be attributed to Future Zahir Wilburn becoming a centerpiece in her life. In addition, her lyrics displayed more 'anticipation', 'joy' and 'surprise' after becoming a parent, sentiments commonly felt by parents in general.
